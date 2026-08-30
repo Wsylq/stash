@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-cream: #faf6f0;
+  --color-sand: #f1e9dd;
+  --color-ink: #221d18;
+  --color-muted: #857a6d;
+  --color-coral: #e85d3f;
+  --color-coral-dark: #d04a2e;
+  --color-mango: #f5a623;
+  --color-mint: #3aafa9;
+  --color-night: #17130f;
+  --color-night-2: #1f1a15;
+  --color-night-card: #262019;
+  --color-night-ink: #f4eee6;
+  --color-card: #ffffff;
+  --font-sans: ui-rounded, "Hiragino Maru Gothic ProN", "Quicksand", "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-coral) 30%, transparent);
+}
+
+/* Hide scrollbars on horizontal rails while keeping scrollability */
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.rail {
+  scrollbar-width: none;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-up {
+  animation: slide-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-pop {
+  animation: pop-in 0.16s ease-out;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.swipe-hint {
+  position: relative;
+}
+.swipe-hint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 55%, color-mix(in srgb, var(--color-coral) 12%, transparent));
+  pointer-events: none;
+  border-radius: inherit;
+}

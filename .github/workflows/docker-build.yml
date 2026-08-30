@@ -1,0 +1,61 @@
+name: Build & push images
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - dockerfile: docker/api.Dockerfile
+            image: stash-api
+          - dockerfile: docker/web.Dockerfile
+            image: stash-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        run: |
+          IMAGE="${{ env.REGISTRY }}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/${{ matrix.image }}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VER="${{ github.ref_name }}"
+            TAGS="$IMAGE:latest,$IMAGE:$VER"
+          else
+            VER="${GITHUB_SHA:0:7}"
+            TAGS="$IMAGE:latest,$IMAGE:$VER"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=Stash (${{ matrix.image }})
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}

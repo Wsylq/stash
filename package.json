@@ -1,0 +1,26 @@
+{
+  "name": "stash",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stash — save anything, organize it, come back to it. Open-source, self-hosted, BYO-AI-key save-for-later app.",
+  "license": "AGPL-3.0-or-later",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace @stash/api",
+    "dev:web": "npm run dev --workspace @stash/web",
+    "build": "npm run build --workspace @stash/shared && npm run build --workspace @stash/api && npm run build --workspace @stash/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

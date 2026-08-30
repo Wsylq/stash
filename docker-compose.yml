@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      STASH_DATA_DIR: /data
+      STASH_SECRET: ${STASH_SECRET:-}
+      STASH_ALLOW_SIGNUP: ${STASH_ALLOW_SIGNUP:-false}
+    volumes:
+      - stash-data:/data
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        API_PROXY_URL: http://api:4000
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      PORT: 3000
+    ports:
+      - "${STASH_PORT:-3000}:3000"
+
+volumes:
+  stash-data:

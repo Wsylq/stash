@@ -1,0 +1,11 @@
+# Root of the repository (used as Docker build context)
+node_modules
+**/node_modules
+**/dist
+**/.next
+.git
+Dockerfile*
+docker-compose*yml
+.env*
+data
+*.log
