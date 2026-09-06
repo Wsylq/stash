@@ -52,6 +52,88 @@ function firstLine(text: string): string {
   return line.length > 80 ? `${line.slice(0, 80)}…` : line;
 }
 
+interface DirectMedia {
+  type: 'video' | 'image';
+  url: string;
+  poster: string | null;
+}
+
+const mediaCache = new Map<string, { at: number; data: DirectMedia | null }>();
+
+function unescapeEmbedUrl(raw: string): string {
+  return raw
+    .replace(/\\+u002F/g, '/')
+    .replace(/\\+u0026/g, '&')
+    .replace(/\\+u0025/g, '%')
+    .replace(/\\+u003D/g, '=')
+    .replace(/\\+u002B/g, '+')
+    .replace(/\\+u003A/g, ':')
+    .replace(/\\+u003F/g, '?')
+    .replace(/\\+\//g, '/')
+    .replace(/\\+/g, '')
+    .replace(/&amp;/g, '&');
+}
+
+function embedJsonUrl(html: string, key: string): string | null {
+  const idx = html.indexOf(key);
+  if (idx === -1) return null;
+  const start = html.indexOf('https', idx);
+  if (start === -1) return null;
+  const end = html.indexOf('\\"', start);
+  if (end === -1 || end - start > 4096) return null;
+  return unescapeEmbedUrl(html.slice(start, end));
+}
+
+function embedMetaImage(html: string): string | null {
+  const m = html.match(/(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/i) ?? html.match(/content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i);
+  return m ? m[1].replace(/^\/\//, 'https://') : null;
+}
+
+async function fetchDirectMedia(url: string): Promise<DirectMedia | null> {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase();
+  if (host !== 'instagram.com' && !host.endsWith('.instagram.com')) return null;
+  const m = u.pathname.match(/^\/(reel|reels|p|tv)\/([^/?#]+)/);
+  if (!m) return null;
+
+  const kind = m[1] === 'reels' ? 'reel' : m[1];
+  const cacheKey = `${kind}/${m[2]}`;
+  const hit = mediaCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < 15 * 60_000) return hit.data;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  let data: DirectMedia | null = null;
+  try {
+    const res = await fetch(`https://www.instagram.com/${kind}/${m[2]}/embed/`, {
+      signal: controller.signal,
+      headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/126' },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const video = embedJsonUrl(html, 'video_url');
+      if (video) {
+        data = { type: 'video', url: video, poster: embedJsonUrl(html, 'display_url') ?? embedMetaImage(html) };
+      } else {
+        const image = embedJsonUrl(html, 'display_url') ?? embedMetaImage(html);
+        if (image) data = { type: 'image', url: image, poster: null };
+      }
+    }
+  } catch {
+    data = null;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  mediaCache.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
 export function registerItems(app: FastifyInstance, config: Config): void {
   const db = () => getDb();
 
@@ -175,6 +257,17 @@ export function registerItems(app: FastifyInstance, config: Config): void {
       return reply.send({ item });
     } catch (err) {
       return sendError(reply, err);
+    }
+  });
+
+  app.get('/api/v1/items/:id/media', async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    try {
+      const { userId } = requireAuth(req, config.secret);
+      const item = loadItem(db(), userId, req.params.id);
+      if (!item) throw new HttpError(404, 'Item not found');
+      return reply.send((await fetchDirectMedia(item.url ?? '')) ?? { type: 'embed' });
+    } catch {
+      return reply.send({ type: 'embed' });
     }
   });
 

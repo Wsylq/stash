@@ -38,6 +38,16 @@ export function getEmbedUrl(url?: string | null): string | null {
   return null;
 }
 
+export function isInstagramUrl(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === 'instagram.com' || host.endsWith('.instagram.com');
+  } catch {
+    return false;
+  }
+}
+
 export function isPortraitEmbed(url?: string | null): boolean {
   if (!url) return false;
   try {
