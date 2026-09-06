@@ -11,7 +11,7 @@ on:
         default: 'https://your-stash.example.com'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -55,3 +55,26 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
           overwrite: true
+
+      - name: Publish APK to rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE_TAG="android-apk"
+          NOTES="Installable debug APK from the latest build.
+
+Install:
+1. Download app-debug.apk
+2. Enable \"Install unknown apps\" for your browser/downloads
+3. Open the APK to install
+
+Runs against your Stash instance — set the URL via the \"workflow_dispatch\" input."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release delete "$RELEASE_TAG" --cleanup-tag --yes
+          fi
+          gh release create "$RELEASE_TAG" "$APK" \
+            --target "$GITHUB_SHA" \
+            --title "Stash Android APK" \
+            --notes "$NOTES"
+          echo "Release updated: https://github.com/$GITHUB_REPOSITORY/releases/latest/download/app-debug.apk"
