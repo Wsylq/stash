@@ -57,6 +57,7 @@ jobs:
           overwrite: true
 
       - name: Publish APK to rolling release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
