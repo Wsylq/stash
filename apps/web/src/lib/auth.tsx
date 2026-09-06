@@ -18,7 +18,7 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(() => getCachedUser());
-  const [loading, setLoading] = useState(() => isAuthed());
+  const [loading, setLoading] = useState(true);
   const authed = !!user;
 
   const refresh = useCallback(async () => {

@@ -24,6 +24,26 @@ export default function ItemDetailPage() {
   const [enriching, setEnriching] = useState(false);
   const [igMedia, setIgMedia] = useState<{ type: 'video' | 'image'; url: string; poster?: string | null } | null>(null);
   const [igMediaDone, setIgMediaDone] = useState(false);
+  const igVideo = isInstagramUrl(item?.url) && item?.type === 'video';
+  const igImage = isInstagramUrl(item?.url) && item?.type !== 'video';
+
+  useEffect(() => {
+    if (!igVideo || !item) return;
+    let alive = true;
+    api
+      .getItemMedia(item.id)
+      .then((m) => {
+        if (!alive) return;
+        if (m.type !== 'embed' && m.url) setIgMedia({ type: m.type, url: m.url, poster: m.poster ?? null });
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setIgMediaDone(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [igVideo, item?.id]);
 
   if (isLoading) {
     return (
@@ -72,28 +92,8 @@ export default function ItemDetailPage() {
   const embedUrl = getEmbedUrl(item.url);
   const portraitEmbed = isPortraitEmbed(item.url);
   const ig = isInstagramUrl(item.url);
-  const igVideo = ig && item.type === 'video';
-  const igImage = ig && !igVideo;
   const igFallback =
     embedUrl && (!ig || (igVideo && igMediaDone && !igMedia) || (igImage && !item.thumbnailUrl));
-
-  useEffect(() => {
-    if (!igVideo) return;
-    let alive = true;
-    api
-      .getItemMedia(item.id)
-      .then((m) => {
-        if (!alive) return;
-        if (m.type !== 'embed' && m.url) setIgMedia({ type: m.type, url: m.url, poster: m.poster ?? null });
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (alive) setIgMediaDone(true);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [igVideo, item.id]);
   const attachments = item.collections
     .map((cid) => collections.find((c) => c.id === cid))
     .filter((c): c is NonNullable<typeof c> => !!c);
