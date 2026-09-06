@@ -16,8 +16,13 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   if (authed) {
-    router.replace('/');
+    router.replace(nextUrl() ?? '/');
     return null;
+  }
+
+  function nextUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('next');
   }
 
   async function submit(e: React.FormEvent) {
@@ -25,7 +30,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await login(email, password);
-      router.replace('/');
+      router.replace(nextUrl() ?? '/');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Sign in failed', 'error');
     } finally {

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import clsx from 'clsx';
 import { Folder, Home, LogIn, Plus, Search, Settings2 } from 'lucide-react';
@@ -92,6 +92,11 @@ function NavItem({ href, icon, label, active }: { href: string; icon: React.Reac
 }
 
 function Gate({ userEmail, onLogout }: { userEmail?: string; onLogout: () => void }) {
+  const router = useRouter();
+  const goToAuth = (path: string) => {
+    const { pathname, search } = window.location;
+    router.push(`${path}?next=${encodeURIComponent(pathname + search)}`);
+  };
   return (
     <div className="flex h-[70dvh] flex-col items-center justify-center gap-3 text-center">
       <div className="text-6xl" aria-hidden>🔐</div>
@@ -100,12 +105,13 @@ function Gate({ userEmail, onLogout }: { userEmail?: string; onLogout: () => voi
         {userEmail ? `Signed in as ${userEmail}. ` : ''}Sign in to see your saved items.
       </p>
       <div className="mt-2 flex items-center gap-2">
-        <Link
-          href="/login"
+        <button
+          type="button"
+          onClick={() => goToAuth('/login')}
           className="flex items-center gap-2 rounded-2xl bg-coral px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-coral/25"
         >
           <LogIn className="h-4 w-4" /> Sign in
-        </Link>
+        </button>
         {userEmail && (
           <button onClick={onLogout} className="rounded-2xl px-4 py-2.5 text-sm font-bold text-muted hover:bg-stone-200/60 dark:hover:bg-night-card">
             Log out
@@ -113,7 +119,10 @@ function Gate({ userEmail, onLogout }: { userEmail?: string; onLogout: () => voi
         )}
       </div>
       <p className="text-xs text-muted/80">
-        First time? <Link href="/register" className="font-bold text-coral">Create an account</Link>
+        First time?{' '}
+        <button type="button" onClick={() => goToAuth('/register')} className="font-bold text-coral">
+          Create an account
+        </button>
       </p>
     </div>
   );

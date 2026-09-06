@@ -17,8 +17,13 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
 
   if (authed) {
-    router.replace('/');
+    router.replace(nextUrl() ?? '/');
     return null;
+  }
+
+  function nextUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('next');
   }
 
   async function submit(e: React.FormEvent) {
@@ -30,7 +35,7 @@ export default function RegisterPage() {
     setBusy(true);
     try {
       await register(email, password);
-      router.replace('/');
+      router.replace(nextUrl() ?? '/');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not create account', 'error');
     } finally {
