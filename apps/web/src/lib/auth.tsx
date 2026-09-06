@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { PublicUser } from '@stash/shared';
-import { api, getCachedUser, isAuthed, onUnauthorized, setAuth } from './api';
+import { api, cacheUser, getCachedUser, isAuthed, onUnauthorized, setAuth } from './api';
 
 interface AuthCtx {
   user: PublicUser | null;
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await api.me();
       setUser(me);
-      setAuth(null, me);
+      cacheUser(me);
     } catch {
       setUser(null);
       setAuth(null, null);

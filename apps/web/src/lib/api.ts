@@ -54,6 +54,11 @@ export function getCachedUser(): PublicUser | null {
   }
 }
 
+export function cacheUser(user: PublicUser): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 export function onUnauthorized(cb: () => void): () => void {
   if (typeof window !== 'undefined') {
     window.addEventListener('stash:unauthorized', cb);
@@ -95,7 +100,7 @@ async function request<T>(path: string, options: { method?: string; body?: Body;
     throw new ApiError(0, 'Cannot reach the Stash server. Is it running?');
   }
 
-  if (res.status === 401 && token) {
+  if (res.status === 401 && (token || getCachedUser())) {
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('stash:unauthorized'));
     throw new ApiError(401, 'Session expired — sign in again');
   }
