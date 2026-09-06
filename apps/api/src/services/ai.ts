@@ -172,6 +172,21 @@ interface ChatJsonResult {
   provider: string;
 }
 
+function providerErrorDetail(data: { error?: { message?: string; metadata?: { raw?: string } } }): string {
+  const message = data.error?.message ?? '';
+  let rawDetail = '';
+  try {
+    const raw = data.error?.metadata?.raw?.trim();
+    if (raw?.startsWith('{')) {
+      const parsed = JSON.parse(raw) as { message?: string };
+      rawDetail = parsed.message ?? '';
+    }
+  } catch { /* ignore malformed metadata */ }
+  return rawDetail || message;
+}
+
+const JSON_MODE_UNSUPPORTED = /response[\s_-]?format|structured[\s_-]?output|json_object|json schema|not support|unsupported/i;
+
 async function callChat(
   settings: AiSettings,
   feature: AiFeatureKey,
@@ -184,38 +199,57 @@ async function callChat(
   if (!model) throw new AiApiError(settings.preset, 0, 'No model configured for this feature.');
   const base = settings.baseUrl.replace(/\/+$/, '');
   const url = `${base}/chat/completions`;
-  const started = Date.now();
-  let res: Response;
-  try {
-    res = await fetch(url, {
+  const messages = [
+    { role: 'system', content: system },
+    { role: 'user', content: user },
+  ];
+  const timeoutMs = opts.timeoutMs ?? 90_000;
+
+  const post = async (withJsonMode: boolean): Promise<Response> => {
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      temperature: 0.2,
+    };
+    if (withJsonMode) body.response_format = { type: 'json_object' };
+    return fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${settings.apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-      }),
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 90_000),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     });
+  };
+
+  const started = Date.now();
+  let res: Response;
+  try {
+    res = await post(true);
+    if (!res.ok) {
+      let body: { error?: { message?: string; metadata?: { raw?: string } } } | null = null;
+      try {
+        body = (await res.json()) as typeof body;
+      } catch { /* ignore */ }
+      if (body && JSON_MODE_UNSUPPORTED.test(providerErrorDetail(body))) {
+        res = await post(false);
+      } else {
+        throw new AiApiError(settings.preset, res.status, providerErrorDetail(body ?? {}) || `Provider returned HTTP ${res.status}.`);
+      }
+    }
   } catch (err) {
+    if (err instanceof AiApiError) throw err;
     const name = (err as Error).name;
     if (name === 'TimeoutError' || name === 'AbortError') {
-      throw new AiApiError(settings.preset, 0, `Request timed out after ${opts.timeoutMs ?? 90_000}ms.`);
+      throw new AiApiError(settings.preset, 0, `Request timed out after ${timeoutMs}ms.`);
     }
     throw new AiApiError(settings.preset, 0, `Network error: ${(err as Error).message}`);
   }
   if (!res.ok) {
     let detail = '';
     try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      detail = body.error?.message ?? '';
+      detail = providerErrorDetail((await res.json()) as { error?: { message?: string; metadata?: { raw?: string } } });
     } catch { /* ignore */ }
     throw new AiApiError(settings.preset, res.status, detail || `Provider returned HTTP ${res.status}.`);
   }
