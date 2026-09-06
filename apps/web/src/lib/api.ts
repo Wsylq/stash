@@ -183,7 +183,7 @@ export function fetchItemTypeHint(text: string, url?: string | null): ItemType |
     const host = u.hostname;
     if (/(^|\.)(youtube\.com|youtu\.be|vimeo\.com|tiktok\.com|twitch\.tv)$/.test(host)) return 'video';
     if (/(^|\.)(allrecipes\.com|foodnetwork\.com|seriouseats\.com|bonappetit\.com|food52\.com)$/.test(host)) return 'recipe';
-    if (/instagram\.com$/.test(host)) return 'image';
+    if (/instagram\.com$/.test(host)) return /\/reel\/|\/reels\/|\/tv\//.test(u.pathname) ? 'video' : 'image';
     if (/amazon\.|store\.steampowered\.com/.test(host)) return 'product';
     if (/open\.spotify\.com|soundcloud\.com/.test(host)) return 'music';
     if (/imdb\.com|letterboxd\.com/.test(host)) return 'movie';

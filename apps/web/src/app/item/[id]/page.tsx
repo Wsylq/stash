@@ -11,6 +11,7 @@ import { useItem, useCollections } from '@/lib/data';
 import { api } from '@/lib/api';
 import { AiStatusDot, Spinner, TypeBadge, useToast } from '@/components/ui';
 import { timeAgo, TYPE_EMOJI } from '@/lib/format';
+import { getEmbedUrl, isPortraitEmbed } from '@/lib/media';
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,6 +67,8 @@ export default function ItemDetailPage() {
 
   const recipe = extractRecipe(item);
   const workout = extractWorkout(item);
+  const embedUrl = getEmbedUrl(item.url);
+  const portraitEmbed = isPortraitEmbed(item.url);
   const attachments = item.collections
     .map((cid) => collections.find((c) => c.id === cid))
     .filter((c): c is NonNullable<typeof c> => !!c);
@@ -115,6 +118,25 @@ export default function ItemDetailPage() {
         <div className="overflow-hidden rounded-3xl border border-stone-200/70 dark:border-night-card">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={item.thumbnailUrl} alt="" className="aspect-video w-full object-cover" loading="lazy" />
+        </div>
+      )}
+
+      {embedUrl && (
+        <div
+          className={clsx(
+            'overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card',
+            portraitEmbed ? 'mx-auto aspect-[9/16] w-full max-w-sm' : 'aspect-video',
+          )}
+        >
+          <iframe
+            src={embedUrl}
+            title={item.title || 'Embedded media'}
+            className="h-full w-full"
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
         </div>
       )}
 
