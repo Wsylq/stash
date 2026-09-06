@@ -124,7 +124,8 @@ export const api = {
   login: (email: string, password: string) =>
     request<AuthResponse>('/auth/login', { method: 'POST', body: { email, password } }),
   me: () => request<PublicUser>('/auth/me'),
-  getItemMedia: (id: string) => request<{ type: 'video' | 'image' | 'embed'; url?: string; poster?: string | null }>(`/items/${id}/media`),
+  getItemMedia: (id: string) =>
+    request<{ type: 'video' | 'image' | 'carousel' | 'embed'; url?: string; poster?: string | null; items?: { type: 'image' | 'video'; url: string; poster?: string | null }[] }>(`/items/${id}/media`),
 
   // items
   listItems: (params: Record<string, string | undefined> = {}) => {

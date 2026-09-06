@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { PublicUser } from '@stash/shared';
-import { api, cacheUser, getCachedUser, isAuthed, onUnauthorized, setAuth } from './api';
+import { ApiError, api, cacheUser, getCachedUser, isAuthed, onUnauthorized, setAuth } from './api';
 
 interface AuthCtx {
   user: PublicUser | null;
@@ -31,9 +31,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const me = await api.me();
       setUser(me);
       cacheUser(me);
-    } catch {
-      setUser(null);
-      setAuth(null, null);
+    } catch (err) {
+      const transient = !(err instanceof ApiError && err.status === 401);
+      console.error(`[auth] refresh failed: ${transient ? 'transient' : 'session expired'} (${(err as Error).message})`);
+      if (transient && getCachedUser()) {
+        setUser(getCachedUser());
+      } else {
+        setUser(null);
+        setAuth(null, null);
+      }
     } finally {
       setLoading(false);
     }

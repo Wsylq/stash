@@ -22,19 +22,18 @@ export default function ItemDetailPage() {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [enriching, setEnriching] = useState(false);
-  const [igMedia, setIgMedia] = useState<{ type: 'video' | 'image'; url: string; poster?: string | null } | null>(null);
+  const [igMedia, setIgMedia] = useState<{ type: 'video' | 'image' | 'carousel'; url?: string; poster?: string | null; items?: { type: 'image' | 'video'; url: string; poster?: string | null }[] } | null>(null);
   const [igMediaDone, setIgMediaDone] = useState(false);
-  const igVideo = isInstagramUrl(item?.url) && item?.type === 'video';
-  const igImage = isInstagramUrl(item?.url) && item?.type !== 'video';
+  const ig = isInstagramUrl(item?.url);
 
   useEffect(() => {
-    if (!igVideo || !item) return;
+    if (!ig || !item) return;
     let alive = true;
     api
       .getItemMedia(item.id)
       .then((m) => {
-        if (!alive) return;
-        if (m.type !== 'embed' && m.url) setIgMedia({ type: m.type, url: m.url, poster: m.poster ?? null });
+        if (!alive || m.type === 'embed') return;
+        setIgMedia({ type: m.type, url: m.url, poster: m.poster ?? null, items: m.items });
       })
       .catch(() => {})
       .finally(() => {
@@ -43,7 +42,7 @@ export default function ItemDetailPage() {
     return () => {
       alive = false;
     };
-  }, [igVideo, item?.id]);
+  }, [ig, item?.id]);
 
   if (isLoading) {
     return (
@@ -91,9 +90,7 @@ export default function ItemDetailPage() {
   const workout = extractWorkout(item);
   const embedUrl = getEmbedUrl(item.url);
   const portraitEmbed = isPortraitEmbed(item.url);
-  const ig = isInstagramUrl(item.url);
-  const igFallback =
-    embedUrl && (!ig || (igVideo && igMediaDone && !igMedia) || (igImage && !item.thumbnailUrl));
+  const igFallback = embedUrl && (!ig || (ig && igMediaDone && !igMedia && !item.thumbnailUrl));
   const attachments = item.collections
     .map((cid) => collections.find((c) => c.id === cid))
     .filter((c): c is NonNullable<typeof c> => !!c);
@@ -146,17 +143,10 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      {igVideo && !igMediaDone && item.thumbnailUrl && (
+      {ig && !igMediaDone && item.thumbnailUrl && (
         <div className="flex max-h-[70dvh] items-center justify-center overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={item.thumbnailUrl ?? ''} alt="" className="max-h-[70dvh] w-full object-contain" loading="lazy" />
-        </div>
-      )}
-
-      {igImage && item.thumbnailUrl && (
-        <div className="flex max-h-[70dvh] items-center justify-center overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.thumbnailUrl} alt={item.title || 'Instagram post'} className="max-h-[70dvh] w-full object-contain" loading="lazy" />
         </div>
       )}
 
@@ -177,6 +167,40 @@ export default function ItemDetailPage() {
         <div className="flex max-h-[70dvh] items-center justify-center overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={igMedia.url ?? item.thumbnailUrl ?? ''} alt="" className="max-h-[70dvh] w-full object-contain" loading="lazy" />
+        </div>
+      )}
+
+      {igMedia?.type === 'carousel' && (
+        <div className="space-y-2">
+          {igMedia.items?.map((media, i) =>
+            media.type === 'video' ? (
+              <div key={i} className="overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card">
+                <video
+                  src={media.url}
+                  poster={media.poster ?? item.thumbnailUrl ?? undefined}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  className="max-h-[70dvh] w-full"
+                />
+              </div>
+            ) : (
+              <div
+                key={i}
+                className="flex max-h-[70dvh] items-center justify-center overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={media.url} alt={`${item.title ?? 'Instagram post'} slide ${i + 1}`} className="max-h-[70dvh] w-full object-contain" loading="lazy" />
+              </div>
+            ),
+          )}
+        </div>
+      )}
+
+      {ig && igMediaDone && !igMedia && item.thumbnailUrl && (
+        <div className="flex max-h-[70dvh] items-center justify-center overflow-hidden rounded-3xl border border-stone-200/70 bg-black dark:border-night-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={item.thumbnailUrl} alt={item.title || 'Instagram post'} className="max-h-[70dvh] w-full object-contain" loading="lazy" />
         </div>
       )}
 

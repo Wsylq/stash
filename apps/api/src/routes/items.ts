@@ -52,10 +52,17 @@ function firstLine(text: string): string {
   return line.length > 80 ? `${line.slice(0, 80)}…` : line;
 }
 
-interface DirectMedia {
-  type: 'video' | 'image';
+interface DirectMediaItem {
+  type: 'image' | 'video';
   url: string;
-  poster: string | null;
+  poster?: string | null;
+}
+
+interface DirectMedia {
+  type: 'video' | 'image' | 'carousel';
+  url?: string;
+  poster?: string | null;
+  items?: DirectMediaItem[];
 }
 
 const mediaCache = new Map<string, { at: number; data: DirectMedia | null }>();
@@ -74,19 +81,49 @@ function unescapeEmbedUrl(raw: string): string {
     .replace(/&amp;/g, '&');
 }
 
-function embedJsonUrl(html: string, key: string): string | null {
-  const idx = html.indexOf(key);
-  if (idx === -1) return null;
-  const start = html.indexOf('https', idx);
-  if (start === -1) return null;
-  const end = html.indexOf('\\"', start);
-  if (end === -1 || end - start > 4096) return null;
-  return unescapeEmbedUrl(html.slice(start, end));
+function collectEmbedImages(html: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (raw: string) => {
+    if (!raw) return;
+    const url = raw.replace(/&amp;/g, '&');
+    if (!url.startsWith('http')) return;
+    try {
+      if (/s100x100|s150x150|s200x200|rsrc\.php/.test(url)) return;
+      const basename = new URL(url).pathname.split('/').filter(Boolean).pop() ?? '';
+      if (!basename || seen.has(basename)) return;
+      seen.add(basename);
+      out.push(url);
+    } catch { /* ignore malformed URLs */ }
+  };
+  for (const m of html.matchAll(/["']EmbeddedMediaImage["'][^>]*src=["']([^"']+)["']/g)) add(m[1]);
+  let idx = html.indexOf('display_url');
+  while (idx !== -1) {
+    const start = html.indexOf('https', idx);
+    const end = html.indexOf('\\"', start);
+    if (start !== -1 && end !== -1 && end - start < 4096) add(unescapeEmbedUrl(html.slice(start, end)));
+    idx = html.indexOf('display_url', idx + 1);
+  }
+  return out;
 }
 
-function embedMetaImage(html: string): string | null {
-  const m = html.match(/(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/i) ?? html.match(/content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i);
-  return m ? m[1].replace(/^\/\//, 'https://') : null;
+function collectEmbedVideos(html: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  let idx = html.indexOf('video_url');
+  while (idx !== -1) {
+    const start = html.indexOf('https', idx);
+    const end = html.indexOf('\\"', start);
+    if (start !== -1 && end !== -1 && end - start < 4096) {
+      const url = unescapeEmbedUrl(html.slice(start, end));
+      if (url.startsWith('http') && !seen.has(url)) {
+        seen.add(url);
+        out.push(url);
+      }
+    }
+    idx = html.indexOf('video_url', idx + 1);
+  }
+  return out;
 }
 
 async function fetchDirectMedia(url: string): Promise<DirectMedia | null> {
@@ -116,12 +153,21 @@ async function fetchDirectMedia(url: string): Promise<DirectMedia | null> {
     });
     if (res.ok) {
       const html = await res.text();
-      const video = embedJsonUrl(html, 'video_url');
-      if (video) {
-        data = { type: 'video', url: video, poster: embedJsonUrl(html, 'display_url') ?? embedMetaImage(html) };
-      } else {
-        const image = embedJsonUrl(html, 'display_url') ?? embedMetaImage(html);
-        if (image) data = { type: 'image', url: image, poster: null };
+      const images = collectEmbedImages(html);
+      const videos = collectEmbedVideos(html);
+      if (videos.length === 1 && images.length <= 1) {
+        data = { type: 'video', url: videos[0], poster: images[0] ?? null };
+      } else if (videos.length === 0 && images.length === 1) {
+        data = { type: 'image', url: images[0] };
+      } else if (images.length > 0 || videos.length > 0) {
+        const items: DirectMediaItem[] = [];
+        if (images.length > 0 && images.length === videos.length) {
+          for (let i = 0; i < images.length; i++) items.push({ type: 'video', url: videos[i], poster: images[i] });
+        } else {
+          for (const image of images) items.push({ type: 'image', url: image });
+          for (const video of videos) items.push({ type: 'video', url: video });
+        }
+        data = { type: 'carousel', items };
       }
     }
   } catch {
