@@ -20,6 +20,7 @@ export const useSave = () => useContext(SaveCtx);
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { authed, user, loading, logout } = useAuth();
   const pathname = usePathname();
+  const isAuthRoute = pathname === '/login' || pathname === '/register';
   const [saveOpen, setSaveOpen] = useState(false);
   const [savePrefill, setSavePrefill] = useState<SaveOptions>({});
 
@@ -39,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <SaveCtx.Provider value={openSave}>
       <div className="mx-auto flex min-h-dvh max-w-2xl flex-col bg-cream dark:bg-night">
-        <main className="flex-1 px-4 pb-28 pt-4 sm:pt-6">{authed ? children : <Gate userEmail={user?.email} onLogout={logout} />}</main>
+        <main className="flex-1 px-4 pb-28 pt-4 sm:pt-6">{authed || isAuthRoute ? children : <Gate userEmail={user?.email} onLogout={logout} />}</main>
 
         {authed && (
           <>
@@ -91,9 +92,6 @@ function NavItem({ href, icon, label, active }: { href: string; icon: React.Reac
 }
 
 function Gate({ userEmail, onLogout }: { userEmail?: string; onLogout: () => void }) {
-  const pathname = usePathname();
-  const isLoginOrRegister = pathname === '/login' || pathname === '/register';
-  if (isLoginOrRegister) return null;
   return (
     <div className="flex h-[70dvh] flex-col items-center justify-center gap-3 text-center">
       <div className="text-6xl" aria-hidden>🔐</div>
